@@ -3,7 +3,7 @@ A TCP proxy over named pipes. Originally created for maintaining a meterpreter s
 
 ![help](https://github.com/dxflatline/misc/raw/master/flatpipes-help.PNG "help")
 
-Since it seems it can help with multiple scenarios, let's list some of the them:
+Since it seems it can help in various situations, let's list a few:
 
 #### TCP 10001 Chat over Named Pipe
 
