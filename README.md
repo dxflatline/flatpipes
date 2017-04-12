@@ -1,6 +1,8 @@
 # flatpipes
 A TCP proxy over named pipes. Originally created for maintaining a meterpreter session over 445 for less network alarms.
 
+![help](https://github.com/dxflatline/misc/raw/master/flatpipes-help.PNG "help")
+
 Since it seems it can help with multiple scenarios, let's list some of the them:
 
 #### TCP 10001 Chat over Named Pipe
