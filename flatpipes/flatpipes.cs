@@ -56,10 +56,11 @@ namespace flatpipesns
     {
         static void Main(string[] args)
         {
-            if (args.Length!=5)
+            if (args.Length!=6)
             {
-                Console.WriteLine("\nUsage: flatpipes [pipemode] [socketmode] [pipename] [ip] [port]\n");
+                Console.WriteLine("\nUsage: flatpipes [pipemode] [socketmode] [pipename] [pipeaddr] [ip] [port]\n");
                 Console.WriteLine("  pipemode\tTo connect to or create locally a pipe (pserver|pclient)");
+                Console.WriteLine("  pipeaddr\tIP for pipe connection (for local or server use '.')");
                 Console.WriteLine("  socketmode\tAfter piping, TCP listen or connect (sserver|sclient)");
                 Console.WriteLine("  pipename\tPrefix of the two pipes created");
                 Console.WriteLine("  ip/port\tSocket info to listen on or connect to");
@@ -68,8 +69,9 @@ namespace flatpipesns
             String pmode = args[0];
             String smode = args[1];
             String pipename = args[2];
-            String ip = args[3];
-            String port = args[4];
+            String pipeaddr = args[3];
+            String ip = args[4];
+            String port = args[5];
             if (String.Compare(pmode, "pserver") ==0)
             {
                 // Handle pipes
@@ -94,7 +96,21 @@ namespace flatpipesns
                 else if (String.Compare(smode, "sserver") == 0)
                 {
                     TcpListener tcpServer = new TcpListener(IPAddress.Parse(ip), Convert.ToInt32(port));
-                    tcpServer.Start();
+                    // Try to start socket listener until no problem occurs
+                    bool ok = false;
+                    while (!ok)
+                    {
+                        try
+                        {
+                            tcpServer.Start();
+                            ok = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("[---] Error while listening. Check if port is used. Trying again in a while..");
+                            Task.Delay(1000).Wait();
+                        }
+                    }
                     Console.WriteLine("[!] Started listener on " + ip + ":" + port);
                     TcpClient tcpClient = tcpServer.AcceptTcpClient();
                     Console.WriteLine("[!] Client Connected to socket");
@@ -112,9 +128,9 @@ namespace flatpipesns
             else if (String.Compare(pmode, "pclient") == 0)//Client
             {
                 // Handle pipes
-                // TODO: Loop until connected
-                var pipe_s2c = new NamedPipeClientStream(".", pipename + "_s2c", PipeDirection.In, PipeOptions.None); // Reading from server
-                var pipe_c2s = new NamedPipeClientStream(".", pipename + "_c2s", PipeDirection.Out, PipeOptions.None); // Writing to server
+                // Even if pserver is not online, it will block until it opens (seems to wait forever)
+                var pipe_s2c = new NamedPipeClientStream(pipeaddr, pipename + "_s2c", PipeDirection.In, PipeOptions.None); // Reading from server
+                var pipe_c2s = new NamedPipeClientStream(pipeaddr, pipename + "_c2s", PipeDirection.Out, PipeOptions.None); // Writing to server
                 pipe_s2c.Connect();
                 Console.WriteLine("[!] Connected to downstream pipe");
                 pipe_c2s.Connect();
@@ -133,7 +149,21 @@ namespace flatpipesns
                 else if (String.Compare(smode, "sserver") == 0)
                 {
                     TcpListener tcpServer = new TcpListener(IPAddress.Parse(ip), Convert.ToInt32(port));
-                    tcpServer.Start();
+                    // Try to start socket listener until no problem occurs
+                    bool ok = false;
+                    while (!ok)
+                    {
+                        try
+                        {
+                            tcpServer.Start();
+                            ok = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("[---] Error while listening. Check if port is used. Trying again in a while..");
+                            Task.Delay(1000).Wait();
+                        }
+                    }
                     Console.WriteLine("[!] Started listener on " + ip + ":" + port);
                     TcpClient tcpClient = tcpServer.AcceptTcpClient();
                     Console.WriteLine("[!] Client Connected to socket");
@@ -175,13 +205,13 @@ namespace flatpipesns
         {
             Task.Factory.StartNew(() =>
             {
-                byte[] netReadBuffer = new byte[256];
+                byte[] netReadBuffer = new byte[1024];
                 int charsread = 0;
                 while (true)
                 {
                     if (networkStream.CanRead)
                     {
-                        charsread = networkStream.Read(netReadBuffer, 0, 10);
+                        charsread = networkStream.Read(netReadBuffer, 0, 250);
                         String s = Convert.ToBase64String(netReadBuffer, 0, charsread);
                         if (charsread > 0)
                         {
@@ -222,13 +252,13 @@ namespace flatpipesns
         {
             Task.Factory.StartNew(() =>
             {
-                byte[] netReadBuffer = new byte[256];
+                byte[] netReadBuffer = new byte[1024];
                 int charsread = 0;
                 while (true)
                 {
                     if (networkStream.CanRead)
                     {
-                        charsread = networkStream.Read(netReadBuffer, 0, 10);
+                        charsread = networkStream.Read(netReadBuffer, 0, 250);
                         String s = Convert.ToBase64String(netReadBuffer, 0, charsread);
                         if (charsread > 0)
                         {
