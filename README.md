@@ -15,7 +15,7 @@ On the 2nd Windows host (pipe client) we just connect to the pipe(s) created pre
 
 Finally, netcat on the two hosts on their listeners and chat with yourself.
 
-#### - Bring a remote port here
+#### Usage - Bring a remote port here
 
 Let's suppose you have access on the MS Fileserver through a Windows "jumphost" workstation. You want to ensure all communications are over 445 since it is normal for workstation to DC. We need to access SSH on another system in the server LAN but we can only connect to MS Fileserver 445 (and eg WMI for command exec)
 
@@ -28,7 +28,7 @@ On the jumphost we PIPE connect to the MS fileserver 10.0.2.10, and immediately 
 Just ssh on 127.0.0.1 22 and you are through the town portal
 
 
-#### - Reverse TCP meterpreter through pipes
+#### Usage - Reverse TCP meterpreter through pipes
 On the MS Fileserver again and you want to maintain persistence, but over 445. You want reverse TCP meterpreter but also you want the jumphost to initiate the 445 connection.
 
 On the MS Fileserver, same as above, we create two pipes and listen on 127.0.0.1 54321 for the reverse TCP meterpreter: 
@@ -41,7 +41,7 @@ What this means is that we can exchange directions, eg use a reverse exploitatio
 
 ---
 
-Todo:
+#### TODO
 * Include a meterpreter bind/reverse stager (exec will C# virtualalloc / createthread)
 * "Monkey patch" the above stager to change port on the fly (on hex)
 * Exception handling. Asap when pipe auth does not work
@@ -49,6 +49,6 @@ Todo:
 
 ---
 
-I hope it will help. It is not very well-written, I welcome comments / looking for feedback.
+I hope it will help. It is not very well-written, comments are welcome / looking for feedback.
 
 <sub>PS: I don't know exactly (or have time to read) the details of CreateNamedPipe access controls. So I assume from MSDN that by using NULL security descriptor we allow RW access to Admins/System/Creator and R to everyone/anon. On the workstation that acts as a pipe client I test using eg *runas /user:server\tester /netonly "flatpipes.exe pclient sserver pipename X.X.X.X 127.0.0.1 10001"*. What happens with */netonly* is that you force an ntlm2 challenge response for all the pipe access requirements of the calls issued by flatpipes.</sub>
