@@ -96,13 +96,12 @@ The first command with "monkey-patch" the meterpreter bytecode on-the-fly to mak
 ---
 
 #### TODO
-* Include a meterpreter bind/reverse stager - Done
-* "Monkey patch" the above stager to change port on the fly - Done
-* Custom payload option
+* Supports one connection, think of ways to do multiple connection handling
+* Custom payload option (undecided on the transfer format b64?)
 * Exception handling. Asap when pipe auth does not work
 
 ---
 
-I hope it will help. It is not very well-written, comments are welcome / looking for feedback.
+I hope it will help. Comments are welcome / looking for feedback.
 
 <sub>PS: I don't know exactly (or have time to read) the details of CreateNamedPipe access controls. So I assume from MSDN that by using NULL security descriptor we allow RW access to Admins/System/Creator and R to everyone/anon. On the workstation that acts as a pipe client I test using eg *runas /user:server\tester /netonly "flatpipes.exe pclient sserver pipename X.X.X.X 127.0.0.1 10001"*. What happens with */netonly* is that you force an ntlm2 challenge response for all the pipe access requirements of the calls issued by flatpipes.</sub>
