@@ -1,4 +1,4 @@
-[![Logo](https://github.com/dxflatline/misc/raw/master/flatpipes-help.png)]
+![Logo](https://github.com/dxflatline/misc/raw/master/flatpipes-help.png)
 
 # flatpipes
 A TCP proxy over named pipes. Originally created for maintaining a meterpreter session over 445 for less network alarms.
