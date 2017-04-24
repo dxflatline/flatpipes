@@ -1,7 +1,7 @@
 # flatpipes
 A TCP proxy over named pipes. Originally created for maintaining a meterpreter session over 445 for less network alarms.
 
-![help](https://github.com/dxflatline/misc/raw/master/flatpipes-help.PNG "help")
+![help](https://github.com/dxflatline/misc/raw/master/flatpipes-help.png "help")
 
 Since it seems it can help in various situations, let's list a few:
 
