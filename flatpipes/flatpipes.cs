@@ -32,6 +32,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.IO.Compression;
+using System.Threading;
 
 namespace flatpipesns
 {
@@ -88,8 +89,8 @@ namespace flatpipesns
                 Console.WriteLine("\nUsage: flatpipes [pipemode] [socketmode] [pipename] [pipeaddr] [ip] [port] [extension]\n");
                 Console.WriteLine("  pipemode\tTo connect to or create locally a pipe (pserver|pclient)");
                 Console.WriteLine("  socketmode\tAfter piping, TCP listen or connect (sserver|sclient)");
-                Console.WriteLine("  pipeaddr\tIP for pipe connection (for local or server use '.')");
                 Console.WriteLine("  pipename\tPrefix of the two pipes created");
+                Console.WriteLine("  pipeaddr\tIP for pipe connection (for local or server use '.')");
                 Console.WriteLine("  ip/port\tSocket info to listen on or connect to");
                 Console.WriteLine("  extension\tMisc tools (revmeter|bindmeter|customhex)");
                 Environment.Exit(1);
@@ -229,7 +230,9 @@ namespace flatpipesns
                         catch (Exception ex)
                         {
                             Console.WriteLine("[*] Error while connecting. Trying again in a while..");
-                            Task.Delay(1000).Wait();
+                            DelayMe(1000);
+                            //System.Threading.Thread.Sleep(1000);
+                            //Task.Delay(1000).Wait();
                         }
                     }
                     networkStream = tcpClient.GetStream();
@@ -250,7 +253,9 @@ namespace flatpipesns
                         catch (Exception ex)
                         {
                             Console.WriteLine("[*] Error while listening. Check if port is used. Trying again in a while..");
-                            Task.Delay(1000).Wait();
+                            DelayMe(1000);
+                            //System.Threading.Thread.Sleep(1000);
+                            //Task.Delay(1000).Wait();
                         }
                     }
                     Console.WriteLine("[!] Started listener on " + ip + ":" + port);
@@ -278,8 +283,10 @@ namespace flatpipesns
 
 
             // PIPE CLIENT IMPLEMENTATION
+
             else if (String.Compare(pmode, "pclient") == 0)
             {
+                Console.WriteLine(pipeaddr);
                 // Handle pipes
                 // Even if pserver is not online, it will block until it opens (seems to wait forever)
                 var pipe_s2c = new NamedPipeClientStream(pipeaddr, pipename + "_s2c", PipeDirection.In, PipeOptions.None); // Reading from server
@@ -315,7 +322,9 @@ namespace flatpipesns
                         catch (Exception ex)
                         {
                             Console.WriteLine("[*] Error while connecting. Trying again in a while..");
-                            Task.Delay(1000).Wait();
+                            DelayMe(1000);
+                            //System.Threading.Thread.Sleep(1000);
+                            //Task.Delay(1000).Wait();
                         }
                     }
                     networkStream = tcpClient.GetStream();
@@ -336,7 +345,9 @@ namespace flatpipesns
                         catch (Exception ex)
                         {
                             Console.WriteLine("[*] Error while listening. Check if port is used. Trying again in a while..");
-                            Task.Delay(1000).Wait();
+                            DelayMe(1000);
+                            //System.Threading.Thread.Sleep(1000);
+                            //Task.Delay(1000).Wait();
                         }
                     }
                     Console.WriteLine("[!] Started listener on " + ip + ":" + port);
@@ -356,6 +367,12 @@ namespace flatpipesns
             }
         }
 
+        static Task DelayMe(int milliseconds)
+        {
+            var tcs = new TaskCompletionSource<object>();
+            new Timer(_ => tcs.SetResult(null)).Change(milliseconds, -1);
+            return tcs.Task;
+        }
 
         /// <summary> 
         /// Pipe functions.
